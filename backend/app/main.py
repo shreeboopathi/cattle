@@ -32,6 +32,56 @@ app = FastAPI(
     version="1.0.0"
 )
 
+@app.on_event("startup")
+def startup_event():
+    # Sync or seed database on startup
+    db = database.SessionLocal()
+    try:
+        # Check if users exist, if not seed default ones
+        user_count = db.query(models.User).count()
+        if user_count == 0:
+            print("No users found. Seeding default accounts (admin & farmer)...")
+            admin_user = models.User(
+                username="admin",
+                email="admin@agriculture.gov.in",
+                hashed_password=auth.get_password_hash("admin123"),
+                role="admin"
+            )
+            db.add(admin_user)
+            
+            demo_user = models.User(
+                username="farmer",
+                email="farmer@kisanmail.in",
+                hashed_password=auth.get_password_hash("farmer123"),
+                role="user"
+            )
+            db.add(demo_user)
+            db.commit()
+
+        # Seed Dataset Info if empty
+        dataset_count = db.query(models.DatasetInfo).count()
+        if dataset_count == 0:
+            print("Seeding dataset counts...")
+            breed_counts = {
+                "Gir": 220, "Sahiwal": 240, "Red Sindhi": 180, "Ongole": 210, 
+                "Tharparkar": 190, "Hallikar": 150, "Kangayam": 160, "Deoni": 170,
+                "Murrah": 250, "Jaffarabadi": 200, "Surti": 180, "Mehsana": 210,
+                "Pandharpuri": 160, "Bhadawari": 140
+            }
+            for breed, count in breed_counts.items():
+                dataset = models.DatasetInfo(
+                    breed_name=breed,
+                    animal_type=BREED_DETAILS[breed]["animal_type"],
+                    image_count=count,
+                    last_updated=datetime.utcnow()
+                )
+                db.add(dataset)
+            db.commit()
+    except Exception as e:
+        print(f"Error seeding database on startup: {e}")
+    finally:
+        db.close()
+
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
