@@ -361,3 +361,28 @@ def export_predictions(admin: models.User = Depends(auth.get_current_admin), db:
 def check_training_charts():
     chart_path = os.path.join(CHARTS_DIR, "training_metrics.png")
     return {"exists": os.path.exists(chart_path)}
+
+# --- SERVE FRONTEND STATIC FILES ---
+FRONTEND_DIR = os.path.join(os.path.dirname(BASE_DIR), "frontend", "dist")
+if os.path.exists(FRONTEND_DIR):
+    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIR, "assets")), name="assets")
+
+@app.get("/{catchall:path}")
+def serve_frontend(catchall: str):
+    # API endpoints should not fallback to index.html
+    if catchall.startswith("api/") or catchall.startswith("docs") or catchall.startswith("openapi.json"):
+        raise HTTPException(status_code=404, detail="Not Found")
+    
+    # Check if the requested path corresponds to a static file in the frontend build
+    if catchall:
+        file_path = os.path.join(FRONTEND_DIR, catchall)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        
+    # Default to index.html for SPA routing
+    index_file = os.path.join(FRONTEND_DIR, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+        
+    return {"message": "API is running. Frontend build not found."}
+
